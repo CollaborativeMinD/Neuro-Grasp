@@ -104,7 +104,7 @@ def acquire_camera_feed(chaos_mode=False):
         
 def pixel_to_robot_frame(pixel_center, pixel_angle):
     """
-    [PLACEHOLDER] - To be updated during 'Math & Matrices' Module.
+    [PLACEHOLDER] - To be updated.
     Converts pixel coordinates to robot frame coordinates.
     """
     # 1. Define the Scale (e.g., 100 pixels = 10mm)
@@ -231,3 +231,4 @@ def execute_mission_sequence(total_cycles=3):
 
 # Execute the loop
 execute_mission_sequence(total_cycles=5)
+
