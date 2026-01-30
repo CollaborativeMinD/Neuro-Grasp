@@ -187,7 +187,8 @@ def execute_mission_sequence(total_cycles=3):
         print(f"[3/3] Detected {len(contours)} potential grasp targets.")
 
         target_found = False 
-      for j, c in enumerate(contours):
+        
+        for j, c in enumerate(contours):
             area = cv2.contourArea(c)
             if area < 1000: continue
             
