@@ -24,3 +24,28 @@ The script is self-contained. Run it directly from the terminal:
 
 ```bash
 python Neuro_Grasp.py
+```
+
+## Output:
+
+* A 5-cycle simulation will run in the console.
+
+* Red Arrow: Orientation (Major Axis)
+
+* Blue Arrow: Grasp Approach (Minor Axis)
+
+* **Telemetry Log**: Real-time conversion of Vision (px) to Robot (mm) coordinates.
+
+## 📦 Dependencies
+* Python 3.10+
+
+* OpenCV (opencv-python)
+
+* NumPy
+
+* Matplotlib
+
+* Seaborn
+
+**Author**: Charles Austin 
+**Focus**: Computer Vision, Robotics Perception, and AI.
