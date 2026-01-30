@@ -1,6 +1,7 @@
-# neuro_grasp_vision_system.py
-# A robust vision system for robotic grasping using PCA and self-healing drivers.
-# --- LOGIC BLOCK I: IMPORTS & DEPENDENCIES ---
+# Neo_Grasp.py
+# A Modular Vision System for Robotic Grasping using PCA
+
+# LOGIC BLOCK I: IMPORTS & DEPENDENCIES
 import sys
 import subprocess
 import math
@@ -21,8 +22,8 @@ def install_and_import(package, import_name=None):
 install_and_import("numpy")
 install_and_import("opencv-python", "cv2")
 install_and_import("seaborn")
-install_and_import ("matplotlib"
-                    )
+install_and_import("matplotlib")
+
 import cv2
 import numpy as np
 import seaborn as sns
@@ -31,7 +32,7 @@ import matplotlib.pyplot as plt
 print("SYSTEM GREEN: Libraries loaded and ready.")
 
 # %%
-# --- LOGIC BLOCK II: CONFIGURATION ---
+# LOGIC BLOCK II: CONFIGURATION
 # The "Rules of Physics" for your simulation
 IMG_SIZE = 600
 OUTPUT_FILE = "grasp_result.png"
@@ -44,7 +45,7 @@ COLOR_MAJOR_AXIS = (0, 0, 255) # Red
 COLOR_MINOR_AXIS = (255, 0, 0) # Blue
 
 # %%
-# --- LOGIC BLOCK III: DATA ACQUISITION & DRIVERS ---
+# LOGIC BLOCK III: (TOOLKIT) DATA ACQUISITION & DRIVERS
 import time
 
 def generate_synthetic_data(simulate_failure=False):
@@ -100,9 +101,29 @@ def acquire_camera_feed(chaos_mode=False):
         except ConnectionError:
             print("   ❌ [DRIVER FAILURE] Manual Intervention Required.")
             return None
+        
+def pixel_to_robot_frame(pixel_center, pixel_angle):
+    """
+    [PLACEHOLDER] - To be updated during 'Math & Matrices' Module.
+    Converts pixel coordinates to robot frame coordinates.
+    """
+    # 1. Define the Scale (e.g., 100 pixels = 10mm)
+    PIXEL_TO_MM_RATIO = 0.1 # 1 pixel = 0.1 mm
+    # 2. Convert pixel coordinates to mm
+    mm_x = pixel_center[0] * PIXEL_TO_MM_RATIO
+    mm_y = pixel_center[1] * PIXEL_TO_MM_RATIO
+    # 3. Angle Translation (Robot might grip at +90 deg offset)
+    robot_wrist_angle = pixel_angle + 90
+    # 4. Apply any necessary transformations (e.g., origin shift, rotation)
+    'ArithmeticError: Placeholder for future kinematic transformations.'
+    '# Steps to implement:'
+    # 5. Return the transformed coordinates and angle
+    return (mm_x, mm_y, robot_wrist_angle)
+
+
 
 # %%
-# --- LOGIC BLOCK IV: GNC ALGORITHMS (PCA) ---
+# LOGIC BLOCK IV: GNC ALGORITHMS (PCA)
 def calculate_grasp_orientation(pts, img):
     """
     Performs PCA (Principal Component Analysis) to find the primary axis.
@@ -145,7 +166,7 @@ def calculate_grasp_orientation(pts, img):
     return angle, cntr
 
 # %%
-# --- LOGIC BLOCK V: MISSION EXECUTION (FLIGHT DIRECTOR) ---
+# LOGIC BLOCK V: MISSION EXECUTION (FLIGHT DIRECTOR)
 def execute_mission_sequence(total_cycles=3):
     print(f"--- Neuro-Grasp: Vision System ({total_cycles} Cycle Test) ---")
 
@@ -184,7 +205,18 @@ def execute_mission_sequence(total_cycles=3):
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
             print(f"   -> TARGET {j}: Center={center} | Grasp Angle={angle:.2f}")
             target_found = True
+            
+            # Send to Robot Frame Conversion (Placeholder)
+            
+            # 1. Get the Vision Data (Pixels)
+            angle, center = calculate_grasp_orientation(c, execution_img)
 
+            # 2. CONVERT TO ROBOT DATA (Millimeters) <--- The new line
+            robot_x, robot_y, robot_grip = pixel_to_robot_frame(center, angle)
+
+            # 3. Print the "Real World" Coordinates
+            print(f"   -> VISION: {center} px | ROBOT: ({robot_x:.1f}, {robot_y:.1f}) mm")
+        
         # --- PHASE 3: VISUALIZATION ---
         if target_found:
             plt.figure(figsize=(6,6)) 
@@ -199,8 +231,3 @@ def execute_mission_sequence(total_cycles=3):
 
 # Execute the loop
 execute_mission_sequence(total_cycles=5)
-
-# %%
-
-
-
