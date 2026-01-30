@@ -1,9 +1,9 @@
 # Neuro-Grasp: PCA-Based Robotic Grasp Detection
 
-**Neuro-Grasp** is a computer vision module designed to calculate 6-DOF grasp poses for unknown objects without relying on large machine learning datasets. It utilizes **Principal Component Analysis (PCA)** to geometrically determine an object's primary axis (Orientation) and secondary axis (Grasp Approach Vector) in real-time.
+**Neuro-Grasp** is a modular computer vision system designed to calculate 6-DOF grasp poses for unknown objects without relying on large machine learning datasets. It utilizes **Principal Component Analysis (PCA)** to geometrically determine an object's primary axis (Orientation) and secondary axis (Grasp Approach Vector) in real-time.
 
 ## 🎯 Project Goal
-To build a robust, low-latency perception system that can identify the optimal "Pick Angle" for a robotic end-effector purely from 2D contour data. This approach is deterministic and computationally cheaper than neural networks for rigid industrial parts.
+To build a robust, low-latency perception system that can identify the optimal "Pick Angle" for a robotic end-effector purely from 2D contour data. This approach is deterministic, explainable, and computationally cheaper than neural networks for rigid industrial parts.
 
 ## 📐 The Math (Why it works)
 Instead of guessing, we calculate the object's **Eigenvectors** from the covariance matrix of its contour points.
@@ -13,34 +13,14 @@ Instead of guessing, we calculate the object's **Eigenvectors** from the covaria
 * **Center of Mass:** The geometric centroid for the suction/gripper target.
 
 ## 🛠️ Technical Workflow
-1.  **Synthetic Generation:** The script generates random "industrial parts" (rectangles) with randomized rotation/scale to validate the algorithm.
-2.  **Preprocessing:** Converts RGB → Grayscale → Binary Threshold.
-3.  **Contour Extraction:** `cv2.findContours` isolates the object boundaries.
-4.  **PCA Solver:** Calculates the mean and eigenvectors of the contour cloud.
-5.  **Visualization:** Projects the 6-DOF pose onto the 2D image.
+1.  **Auto-Configuration:** The script automatically verifies and installs missing dependencies upon launch.
+2.  **Resilient Acquisition:** A self-healing driver manages the camera feed, automatically resetting the connection if signal loss is detected.
+3.  **Preprocessing:** Converts RGB → Grayscale → Binary Threshold.
+4.  **PCA Solver:** Calculates the mean and eigenvectors of the contour cloud to derive the grasp pose.
+5.  **Kinematics Bridge:** Translates pixel coordinates into Robot Frame (mm) telemetry.
 
 ## 🚀 Usage
-The script is self-contained and will verify dependencies automatically.
+The script is self-contained. Run it directly from the terminal:
 
 ```bash
-python neuro_grasp.py
-
-```
-
-**Output:**
-
-* The script will generate a file named `grasp_result.png`.
-* **Red Arrow:** Orientation (Major Axis)
-* **Blue Arrow:** Grasp Approach (Minor Axis)
-* **Yellow Dot:** Suction Target (Centroid)
-
-## 📦 Dependencies
-
-* Python 3.10+
-* OpenCV (`opencv-python`)
-* NumPy
-
----
-
-**Author:** Charles Austin
-*Focus: Computer Vision, Robotics Perception, and AI.*
+python Neuro_Grasp.py
