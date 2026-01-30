@@ -1,4 +1,4 @@
-# Neo_Grasp.py
+# Neuro_Grasp.py
 # A Modular Vision System for Robotic Grasping using PCA
 
 # LOGIC BLOCK I: IMPORTS & DEPENDENCIES
@@ -31,7 +31,6 @@ import matplotlib.pyplot as plt
 
 print("SYSTEM GREEN: Libraries loaded and ready.")
 
-# %%
 # LOGIC BLOCK II: CONFIGURATION
 # The "Rules of Physics" for your simulation
 IMG_SIZE = 600
@@ -44,7 +43,6 @@ COLOR_CENTER = (0, 255, 255) # Yellow
 COLOR_MAJOR_AXIS = (0, 0, 255) # Red
 COLOR_MINOR_AXIS = (255, 0, 0) # Blue
 
-# %%
 # LOGIC BLOCK III: (TOOLKIT) DATA ACQUISITION & DRIVERS
 import time
 
@@ -120,9 +118,6 @@ def pixel_to_robot_frame(pixel_center, pixel_angle):
     # 5. Return the transformed coordinates and angle
     return (mm_x, mm_y, robot_wrist_angle)
 
-
-
-# %%
 # LOGIC BLOCK IV: GNC ALGORITHMS (PCA)
 def calculate_grasp_orientation(pts, img):
     """
@@ -165,7 +160,6 @@ def calculate_grasp_orientation(pts, img):
     
     return angle, cntr
 
-# %%
 # LOGIC BLOCK V: MISSION EXECUTION (FLIGHT DIRECTOR)
 def execute_mission_sequence(total_cycles=3):
     print(f"--- Neuro-Grasp: Vision System ({total_cycles} Cycle Test) ---")
@@ -193,29 +187,26 @@ def execute_mission_sequence(total_cycles=3):
         print(f"[3/3] Detected {len(contours)} potential grasp targets.")
 
         target_found = False 
-        for j, c in enumerate(contours):
+      for j, c in enumerate(contours):
             area = cv2.contourArea(c)
             if area < 1000: continue
             
-            # Execute PCA Logic from Block IV
+            # 1. Execute PCA Logic (Run this ONCE)
             angle, center = calculate_grasp_orientation(c, execution_img)
             
+            # 2. Telemetry Overlay
             label = f"Angle: {int(angle)} deg"
             cv2.putText(execution_img, label, (center[0] - 100, center[1] - 80), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-            print(f"   -> TARGET {j}: Center={center} | Grasp Angle={angle:.2f}")
-            target_found = True
             
-            # Send to Robot Frame Conversion (Placeholder)
-            
-            # 1. Get the Vision Data (Pixels)
-            angle, center = calculate_grasp_orientation(c, execution_img)
-
-            # 2. CONVERT TO ROBOT DATA (Millimeters) <--- The new line
+            # 3. CONVERT TO ROBOT DATA (Millimeters)
+            # Use the 'angle' and 'center' we already calculated above!
             robot_x, robot_y, robot_grip = pixel_to_robot_frame(center, angle)
 
-            # 3. Print the "Real World" Coordinates
+            # 4. Mission Log
+            print(f"   -> TARGET {j}: Center={center} | Grasp Angle={angle:.2f}")
             print(f"   -> VISION: {center} px | ROBOT: ({robot_x:.1f}, {robot_y:.1f}) mm")
+            target_found = True
         
         # --- PHASE 3: VISUALIZATION ---
         if target_found:
@@ -231,4 +222,3 @@ def execute_mission_sequence(total_cycles=3):
 
 # Execute the loop
 execute_mission_sequence(total_cycles=5)
-
