@@ -1,51 +1,75 @@
-# Neuro-Grasp: PCA-Based Robotic Grasp Detection
+# 👁️ Neuro-Grasp: PCA-Based Robotic Grasp Detection
+
+![Status](https://img.shields.io/badge/Status-Active-brightgreen)
+![Pylint](https://img.shields.io/badge/Pylint-10.00%2F10-brightgreen)
+![Tests](https://img.shields.io/badge/Unit_Tests-12%2F12_Passing-brightgreen)
+![License](https://img.shields.io/badge/License-MIT-blue)
 
 **Neuro-Grasp** is a modular computer vision system designed to calculate 6-DOF grasp poses for unknown objects without relying on large machine learning datasets. It utilizes **Principal Component Analysis (PCA)** to geometrically determine an object's primary axis (Orientation) and secondary axis (Grasp Approach Vector) in real-time.
 
-## 🎯 Project Goal
-To build a robust, low-latency perception system that can identify the optimal "Pick Angle" for a robotic end-effector purely from 2D contour data. This approach is deterministic, explainable, and computationally cheaper than neural networks for rigid industrial parts.
+## 📊 Perception Telemetry (PCA Analysis)
+*Visual verification of the PCA Solver identifying Major and Minor axes for optimal grasp planning.*
 
-## 📐 The Math (Why it works)
-Instead of guessing, we calculate the object's **Eigenvectors** from the covariance matrix of its contour points.
+| **Cycle 1: Orientation** | **Cycle 2: Alignment** | **Cycle 3: Precision** |
+| :---: | :---: | :---: |
+| ![Cycle 1](Cycle_1_PCA_Vector1.png) ![Cycle 1](Cycle_1_PCA_Grasp_Vector.png) | ![Cycle 2](Cycle_1_PCA_Vector2.png)![Cycle 2](Cycle_2_PCA_Grasp_Vector.png) | ![Cycle 3](Cycle_1_PCA_Vector3.png)![Cycle 3](Cycle_3_PCA_Grasp_Vector.png) |
+| **Angle:** -19.4° | **Angle:** -23.9° | **Angle:** 94.4° |
+| **Status:** ✅ Target Detected | **Status:** ✅ Target Detected | **Status:** ✅ Target Detected |
 
-* **First Eigenvector (Major Axis):** Defines the object's length/orientation.
-* **Second Eigenvector (Minor Axis):** Defines the object's width (The Approach Vector).
-* **Center of Mass:** The geometric centroid for the suction/gripper target.
+---
 
-## 🛠️ Technical Workflow
-1.  **Auto-Configuration:** The script automatically verifies and installs missing dependencies upon launch.
-2.  **Resilient Acquisition:** A self-healing driver manages the camera feed, automatically resetting the connection if signal loss is detected.
-3.  **Preprocessing:** Converts RGB → Grayscale → Binary Threshold.
-4.  **PCA Solver:** Calculates the mean and eigenvectors of the contour cloud to derive the grasp pose.
-5.  **Kinematics Bridge:** Translates pixel coordinates into Robot Frame (mm) telemetry.
+## 📐 The Math (Deterministic Perception)
+Instead of stochastic guessing, we calculate the object's **Eigenvectors** from the covariance matrix of its contour points. 
+
+* **First Eigenvector (Major Axis - Red):** Defines the object's length and primary orientation.
+* **Second Eigenvector (Minor Axis - Blue):** Defines the object's width, used to set the **Grasp Approach Vector**.
+* **Center of Mass (Yellow Dot):** The geometric centroid target for the end-effector.
+
+
+---
+
+## ✅ Quality Assurance & Verification
+This repository adheres to strict Systems Engineering software standards to ensure reliability in industrial environments.
+
+| Metric | Status | Standard |
+| :--- | :--- | :--- |
+| **Static Analysis** | `10.00/10` | **Pylint** (PEP 8 Strict) |
+| **Unit Testing** | `12/12 PASSED` | **unittest** (PCA Math & PACE Drivers) |
+| **Fault Tolerance** | **PACE** | Self-healing Driver Recovery (Primary/Alt/Cont/Emerg) |
+| **Kinematics** | **VERIFIED** | Accurate Pixel-to-MM Coordinate Mapping |
+
+### Automated Test Battery
+The system includes `test_neuro_grasp.py`, covering:
+1.  **PCA Orientation Math:** Validating eigenvector stability for horizontal and vertical parts.
+2.  **Driver Resilience:** Testing the "PACE" self-healing logic during transient hardware signal loss.
+3.  **Coordinate Integrity:** Verifying the pixel-to-millimeter transformation for robot frame integration.
+
+---
 
 ## 🚀 Usage
-The script is self-contained. Run it directly from the terminal:
 
+### 1. Run the Perception Mission
+The system performs a pre-flight unit test check before initializing the camera driver.
 ```bash
-python Neuro_Grasp.py
+python neuro_grasp.py
+
 ```
 
-## Output:
+### 2. Run the Verification Suite
 
-* A 5-cycle simulation will run in the console.
+```bash
+python test_neuro_grasp.py
 
-* Red Arrow: Orientation (Major Axis)
-
-* Blue Arrow: Grasp Approach (Minor Axis)
-
-* **Telemetry Log**: Real-time conversion of Vision (px) to Robot (mm) coordinates.
+```
 
 ## 📦 Dependencies
-* Python 3.10+
 
-* OpenCV (opencv-python)
+* **Python 3.10+**
+* **OpenCV** (Geometric Perception)
+* **NumPy** (Matrix Math)
+* **Matplotlib** (Telemetry Visualization)
 
-* NumPy
+---
 
-* Matplotlib
-
-* Seaborn
-
-**Author**: Charles Austin 
-**Focus**: Computer Vision, Robotics Perception, and AI.
+**Author:** Charles Austin (Senior Systems Architect)
+*Focus: Computer Vision, Robotics Perception, and Deterministic AI.*
