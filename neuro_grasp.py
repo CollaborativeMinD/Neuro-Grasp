@@ -1,225 +1,251 @@
-# Neuro_Grasp.py
-# A Modular Vision System for Robotic Grasping using PCA
+"""
+Neuro-Grasp: PCA-Based Robotic Grasp Detection System.
 
-# LOGIC BLOCK I: IMPORTS & DEPENDENCIES
+Refactored for high-integrity industrial environments.
+Implements deterministic PCA for orientation calculation with 
+real-time vector visualization.
+
+Architecture:
+    - Model: VisionProcessor (PCA Logic), GraspPose (Data Object)
+    - Hardware: SyntheticCamera (Driver Layer)
+    - Controller: GraspOrchestrator (Mission Logic)
+
+Author: Senior Systems Architect (Refactored)
+Original Author: Charles Austin
+"""
+
+# pylint: disable=no-member
+
 import sys
-import subprocess
+import time
 import math
 import random
-import os
-
-# The "Auto-Installer" - Keeps your environment portable
-def install_and_import(package, import_name=None):
-    if import_name is None: import_name = package
-    try:
-        __import__(import_name)
-    except ImportError:
-        print(f"[INFO] {package} not found. Installing automatically...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-        print(f"[INFO] {package} installed. Continuing...")
-
-# Summoning the heavy lifters
-install_and_import("numpy")
-install_and_import("opencv-python", "cv2")
-install_and_import("seaborn")
-install_and_import("matplotlib")
+import logging
+import unittest
+from dataclasses import dataclass
+from typing import Tuple, Optional, Dict, Any
 
 import cv2
 import numpy as np
-import seaborn as sns
 import matplotlib.pyplot as plt
 
-print("SYSTEM GREEN: Libraries loaded and ready.")
+# --- CELL 1: IMPORTS & CONFIGURATION ---
 
-# LOGIC BLOCK II: CONFIGURATION
-# The "Rules of Physics" for your simulation
-IMG_SIZE = 600
-OUTPUT_FILE = "grasp_result.png"
+# Configure System Logging
+logging.basicConfig(level=logging.INFO)
+LOGGER = logging.getLogger("NeuroGrasp")
 
-# Visualization colors (BGR Format for OpenCV)
-COLOR_BACKGROUND = (0, 0, 0)
-COLOR_OBJECT = (255, 255, 255)
-COLOR_CENTER = (0, 255, 255) # Yellow
-COLOR_MAJOR_AXIS = (0, 0, 255) # Red
-COLOR_MINOR_AXIS = (255, 0, 0) # Blue
+@dataclass(frozen=True)
+class VisionConfig:
+    """Immutable parameters for image processing."""
+    img_size: int = 600
+    min_area: float = 1000.0
+    binary_threshold: int = 50
+    scale_factor: int = 150
+    # BGR Colors
+    color_center: Tuple[int, int, int] = (0, 255, 255) # Yellow
+    color_major: Tuple[int, int, int] = (0, 0, 255)   # Red
+    color_minor: Tuple[int, int, int] = (255, 0, 0)   # Blue
 
-# LOGIC BLOCK III: (TOOLKIT) DATA ACQUISITION & DRIVERS
-import time
+@dataclass(frozen=True)
+class RobotConfig:
+    """Kinematic transformation constants."""
+    pixel_to_mm: float = 0.1
+    angle_offset_deg: float = 90.0
 
-def generate_synthetic_data(simulate_failure=False):
-    """
-    HARDWARE SIMULATOR:
-    Generates a black image with a random white rectangle.
-    Raises ConnectionError if 'simulate_failure' is True.
-    """
-    if simulate_failure:
-        raise ConnectionError("CRITICAL: Camera Feed Lost - Signal Interrupted")
+@dataclass
+class GraspPose:
+    """Standardized object for passing grasp telemetry."""
+    center_px: Tuple[int, int]
+    angle_deg: float
+    center_mm: Tuple[float, float]
+    robot_angle: float
+    eigenvalues: np.ndarray
+    eigenvectors: np.ndarray
 
-    img = np.zeros((IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
-    
-    # Random dimensions for the "part"
-    w, h = random.randint(100, 300), random.randint(50, 100)
-    angle = random.randint(0, 360)
-    center = (random.randint(150, 450), random.randint(150, 450))
-    
-    rect = ((center[0], center[1]), (w, h), angle)
-    box = cv2.boxPoints(rect)
-    box = np.intp(box)
-    
-    cv2.drawContours(img, [box], 0, COLOR_OBJECT, -1)
-    
-    # Only print "Generated" if successful (reduces log noise)
-    # print(f"DEBUG: Generated part at {center}") 
-    return img
+# --- CELL 2: CLASS DEFINITIONS & LOGIC ---
 
-def acquire_camera_feed(chaos_mode=False):
-    """
-    THE DRIVER (Self-Healing):
-    Attempts to acquire an image. 
-    If hardware fails, it automatically pauses, resets, and retries.
-    Returns: Image (numpy array) or None (if critical failure).
-    """
-    try:
-        # Attempt 1: Normal Acquisition
-        return generate_synthetic_data(simulate_failure=chaos_mode)
+class SyntheticCamera:
+    """Simulates a camera driver with self-healing capabilities."""
 
-    except ConnectionError as e:
-        # The Recovery Logic (Encapsulated here, not in the main loop)
-        print(f"   ⚠️ [DRIVER WARNING] {e}")
-        print("   >>> [DRIVER ACTION] Connection Unstable. Initiating Reset (3s)...")
-        time.sleep(3) # The physical pause
-        
+    def __init__(self, size: int = 600) -> None:
+        self.size = size
+        self.frame_count = 0
+
+    def get_status(self) -> str:
+        """Returns the health status of the driver."""
+        return f"ONLINE: {self.frame_count} frames processed"
+
+    def reset_driver(self) -> None:
+        """Resets the internal driver state."""
+        self.frame_count = 0
+        LOGGER.info("Camera Driver Reset.")
+
+    def _generate_frame(self, simulate_failure: bool) -> np.ndarray:
+        """Internal method to generate synthetic part geometry."""
+        if simulate_failure:
+            raise ConnectionError("Driver Fault: Camera Signal Interrupted.")
+
+        img = np.zeros((self.size, self.size, 3), dtype=np.uint8)
+        width, height = random.randint(100, 300), random.randint(50, 100)
+        angle = random.randint(0, 360)
+        center = (random.randint(150, 450), random.randint(150, 450))
+
+        rect = ((center[0], center[1]), (width, height), angle)
+        box = cv2.boxPoints(rect)
+        box = np.intp(box)
+        cv2.drawContours(img, [box], 0, (255, 255, 255), -1)
+        return img
+
+    def get_frame(self, chaos_mode: bool = False) -> Optional[np.ndarray]:
+        """Acquire frame with PACE recovery logic."""
         try:
-            print("   >>> [DRIVER ACTION] Reconnecting...")
-            # Retry with failure disabled (Simulating a successful reboot)
-            img = generate_synthetic_data(simulate_failure=False) 
-            print("   ✅ [DRIVER STATUS] Connection Restored.")
-            return img
-            
-        except ConnectionError:
-            print("   ❌ [DRIVER FAILURE] Manual Intervention Required.")
-            return None
-        
-def pixel_to_robot_frame(pixel_center, pixel_angle):
-    """
-    [PLACEHOLDER] - To be updated.
-    Converts pixel coordinates to robot frame coordinates.
-    """
-    # 1. Define the Scale (e.g., 100 pixels = 10mm)
-    PIXEL_TO_MM_RATIO = 0.1 # 1 pixel = 0.1 mm
-    # 2. Convert pixel coordinates to mm
-    mm_x = pixel_center[0] * PIXEL_TO_MM_RATIO
-    mm_y = pixel_center[1] * PIXEL_TO_MM_RATIO
-    # 3. Angle Translation (Robot might grip at +90 deg offset)
-    robot_wrist_angle = pixel_angle + 90
-    # 4. Apply any necessary transformations (e.g., origin shift, rotation)
-    'ArithmeticError: Placeholder for future kinematic transformations.'
-    '# Steps to implement:'
-    # 5. Return the transformed coordinates and angle
-    return (mm_x, mm_y, robot_wrist_angle)
+            frame = self._generate_frame(simulate_failure=chaos_mode)
+            self.frame_count += 1
+            return frame
+        except ConnectionError as err:
+            LOGGER.warning("Hardware glitch detected: %s. Retrying...", err)
+            time.sleep(1.0)
+            try:
+                frame = self._generate_frame(simulate_failure=False)
+                self.frame_count += 1
+                return frame
+            except ConnectionError:
+                LOGGER.error("Critical Driver Failure. Manual reset required.")
+                return None
 
-# LOGIC BLOCK IV: GNC ALGORITHMS (PCA)
-def calculate_grasp_orientation(pts, img):
-    """
-    Performs PCA (Principal Component Analysis) to find the primary axis.
-    """
-    # Construct a buffer used by the pca analysis
-    sz = len(pts)
-    data_pts = np.empty((sz, 2), dtype=np.float64)
-    for i in range(data_pts.shape[0]):
-        data_pts[i,0] = pts[i,0,0]
-        data_pts[i,1] = pts[i,0,1]
-    
-    # Perform PCA analysis
-    mean = np.empty((0))
-    mean, eigenvectors, eigenvalues = cv2.PCACompute2(data_pts, mean)
-    
-    # Store the center of the object
-    cntr = (int(mean[0,0]), int(mean[0,1]))
-    
-    # Visualization: Draw the Center Point
-    cv2.circle(img, cntr, 5, COLOR_CENTER, -1)
+class VisionProcessor:
+    """Performs geometric analysis and coordinate transformation."""
 
-    # --- CALCULATE GRASP AXIS ---
-    scale_factor = 150 
-    
-    # Major Axis (Red) - Orientation
-    p1 = (cntr[0] + 0.02 * eigenvectors[0,0] * eigenvalues[0,0] * scale_factor,
-          cntr[1] + 0.02 * eigenvectors[0,1] * eigenvalues[0,0] * scale_factor)
-    
-    # Minor Axis (Blue) - The Approach Vector
-    p2 = (cntr[0] - 0.02 * eigenvectors[1,0] * eigenvalues[1,0] * scale_factor,
-          cntr[1] - 0.02 * eigenvectors[1,1] * eigenvalues[1,0] * scale_factor)
+    def __init__(self, v_cfg: VisionConfig, r_cfg: RobotConfig) -> None:
+        self.v_cfg = v_cfg
+        self.r_cfg = r_cfg
 
-    # Draw Axis
-    cv2.arrowedLine(img, cntr, (int(p1[0]), int(p1[1])), COLOR_MAJOR_AXIS, 3, tipLength=0.1)
-    cv2.arrowedLine(img, cntr, (int(p2[0]), int(p2[1])), COLOR_MINOR_AXIS, 3, tipLength=0.1)
-    
-    # Calculate Angle in degrees
-    angle = math.atan2(eigenvectors[0,1], eigenvectors[0,0]) * 180 / math.pi
-    
-    return angle, cntr
+    def get_config_summary(self) -> Dict[str, Any]:
+        """Returns current operational parameters for system audit."""
+        return {
+            "img_size": self.v_cfg.img_size,
+            "min_area": self.v_cfg.min_area,
+            "px_to_mm": self.r_cfg.pixel_to_mm
+        }
 
-# LOGIC BLOCK V: MISSION EXECUTION (FLIGHT DIRECTOR)
-def execute_mission_sequence(total_cycles=3):
-    print(f"--- Neuro-Grasp: Vision System ({total_cycles} Cycle Test) ---")
+    def calculate_grasp_pose(self, contour: np.ndarray) -> GraspPose:
+        """Executes PCA to find orientation and maps to robot coordinates."""
+        data_pts = contour.reshape(-1, 2).astype(np.float64)
+        mean, eigenvectors, eigenvalues = cv2.PCACompute2(data_pts, np.array([]))
 
-    for i in range(1, total_cycles + 1):
-        print(f"\n[CYCLE {i}/{total_cycles}] Pinging Sensor Array...")
+        center_px = (int(mean[0, 0]), int(mean[0, 1]))
+        angle_rad = math.atan2(eigenvectors[0, 1], eigenvectors[0, 0])
+        angle_deg = math.degrees(angle_rad)
 
-        # --- PHASE 1: ACQUISITION ---
-        print("[1/3] Acquiring Camera Feed...")
-        # We pass 'chaos_mode=True' to randomly test the failsafe inside the driver.
-        is_sabotage = (random.random() < 0.2)
-        execution_img = acquire_camera_feed(chaos_mode=is_sabotage)
+        mm_x = center_px[0] * self.r_cfg.pixel_to_mm
+        mm_y = center_px[1] * self.r_cfg.pixel_to_mm
+        robot_angle = angle_deg + self.r_cfg.angle_offset_deg
 
-        # CRITICAL CHECK: If the driver returns None, it means even the retry failed.
-        if execution_img is None:
-            print("   ❌ [MISSION ABORT] Sensor Failure. Skipping Cycle.")
-            continue 
+        return GraspPose(
+            center_px=center_px,
+            angle_deg=angle_deg,
+            center_mm=(mm_x, mm_y),
+            robot_angle=robot_angle,
+            eigenvalues=eigenvalues,
+            eigenvectors=eigenvectors
+        )
 
-        # --- PHASE 2: PROCESSING ---
-        print("[2/3] Processing Topography...")
-        gray = cv2.cvtColor(execution_img, cv2.COLOR_BGR2GRAY)
-        _, thresh = cv2.threshold(gray, 50, 255, cv2.THRESH_BINARY)
-        contours, _ = cv2.findContours(thresh, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+    def draw_telemetry(self, img: np.ndarray, pose: GraspPose) -> None:
+        """Overlays PCA vectors (Red/Blue) and data on the frame."""
+        cntr = pose.center_px
+        cv2.circle(img, cntr, 5, self.v_cfg.color_center, -1)
+        scale = 0.02 * self.v_cfg.scale_factor
+        p1 = (int(cntr[0] + pose.eigenvectors[0, 0] * pose.eigenvalues[0, 0] * scale),
+              int(cntr[1] + pose.eigenvectors[0, 1] * pose.eigenvalues[0, 0] * scale))
+        p2 = (int(cntr[0] - pose.eigenvectors[1, 0] * pose.eigenvalues[1, 0] * scale),
+              int(cntr[1] - pose.eigenvectors[1, 1] * pose.eigenvalues[1, 0] * scale))
+        cv2.arrowedLine(img, cntr, p1, self.v_cfg.color_major, 3, tipLength=0.1)
+        cv2.arrowedLine(img, cntr, p2, self.v_cfg.color_minor, 3, tipLength=0.1)
+        label = f"Angle: {int(pose.angle_deg)} deg"
+        cv2.putText(img, label, (cntr[0] - 100, cntr[1] - 80),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-        print(f"[3/3] Detected {len(contours)} potential grasp targets.")
+# --- CELL 3: UNIT TESTS ---
 
-        target_found = False 
-        
-        for j, c in enumerate(contours):
-            area = cv2.contourArea(c)
-            if area < 1000: continue
-            
-            # 1. Execute PCA Logic (Run this ONCE)
-            angle, center = calculate_grasp_orientation(c, execution_img)
-            
-            # 2. Telemetry Overlay
-            label = f"Angle: {int(angle)} deg"
-            cv2.putText(execution_img, label, (center[0] - 100, center[1] - 80), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-            
-            # 3. CONVERT TO ROBOT DATA (Millimeters)
-            # Use the 'angle' and 'center' we already calculated above!
-            robot_x, robot_y, robot_grip = pixel_to_robot_frame(center, angle)
+class TestVisionLogic(unittest.TestCase):
+    """Verifies deterministic math and configuration gates."""
 
-            # 4. Mission Log
-            print(f"   -> TARGET {j}: Center={center} | Grasp Angle={angle:.2f}")
-            print(f"   -> VISION: {center} px | ROBOT: ({robot_x:.1f}, {robot_y:.1f}) mm")
-            target_found = True
-        
-        # --- PHASE 3: VISUALIZATION ---
-        if target_found:
-            plt.figure(figsize=(6,6)) 
-            plt.imshow(cv2.cvtColor(execution_img, cv2.COLOR_BGR2RGB))
-            plt.title(f"Cycle {i}: Target Locked")
-            plt.axis('off')
-            plt.show()
-        else:
-            print("   [INFO] No valid targets found in this scan.")
+    def setUp(self) -> None:
+        self.v_cfg = VisionConfig()
+        self.r_cfg = RobotConfig()
+        self.processor = VisionProcessor(self.v_cfg, self.r_cfg)
 
-    print("\n--- MISSION COMPLETE. SYSTEM STANDBY. ---")
+    def test_coordinate_transformation(self) -> None:
+        """Test that pixel to mm conversion logic remains stable."""
+        dummy_contour = np.array([[[100, 100]], [[110, 100]], [[110, 110]]])
+        pose = self.processor.calculate_grasp_pose(dummy_contour)
+        self.assertAlmostEqual(pose.center_mm[0], 10.6, delta=0.5)
 
-# Execute the loop
-execute_mission_sequence(total_cycles=5)
+    def test_driver_recovery(self) -> None:
+        """Verify the driver handles signal loss gracefully."""
+        cam = SyntheticCamera()
+        frame = cam.get_frame(chaos_mode=True)
+        self.assertIsNotNone(frame, "Driver failed to recover from transient error")
+
+# --- CELL 4: MISSION EXECUTION ---
+
+class GraspOrchestrator:
+    """High-level mission controller."""
+
+    def __init__(self) -> None:
+        self.v_cfg = VisionConfig()
+        self.r_cfg = RobotConfig()
+        self.camera = SyntheticCamera(self.v_cfg.img_size)
+        self.processor = VisionProcessor(self.v_cfg, self.r_cfg)
+        self.mission_active = False
+
+    def get_mission_state(self) -> bool:
+        """Returns the current status of the mission."""
+        return self.mission_active
+
+    def run_mission(self, cycles: int = 3) -> None:
+        """Executes the perception loop with real-time visualization."""
+        self.mission_active = True
+        print(f"\n--- NEURO-GRASP ACTIVE: {cycles} CYCLE TEST ---")
+        for i in range(1, cycles + 1):
+            print(f"[CYCLE {i}/{cycles}] Scanning Array...")
+            is_unstable = random.random() < 0.2
+            frame = self.camera.get_frame(chaos_mode=is_unstable)
+            if frame is None:
+                continue
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            _, thr = cv2.threshold(gray, self.v_cfg.binary_threshold, 255, cv2.THRESH_BINARY)
+            cnts, _ = cv2.findContours(thr, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+            target_found = False
+            for contour in cnts:
+                if cv2.contourArea(contour) < self.v_cfg.min_area:
+                    continue
+                pose = self.processor.calculate_grasp_pose(contour)
+                self.processor.draw_telemetry(frame, pose)
+                print(f"  ✅ TARGET DETECTED: Angle={pose.angle_deg:.1f}°")
+                print(f"  🤖 ROBOT TELEMETRY: ({pose.center_mm[0]:.1f}, {pose.center_mm[1]:.1f}) mm")
+                target_found = True
+            if target_found:
+                plt.figure(figsize=(6, 6))
+                plt.imshow(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                plt.title(f"Cycle {i}: PCA Grasp Vector")
+                plt.axis('off')
+                plt.show(block=False)
+                plt.pause(1)
+                plt.close()
+        self.mission_active = False
+        print("--- MISSION COMPLETE. SYSTEM STANDBY. ---")
+
+if __name__ == "__main__":
+    # 1. Pre-flight unit test verification
+    LOADER = unittest.TestLoader()
+    SUITE = LOADER.loadTestsFromTestCase(TestVisionLogic)
+    RUNNER = unittest.TextTestRunner(verbosity=0)
+    # 2. Execute tests and launch mission if successful
+    RESULT = RUNNER.run(SUITE)
+    if RESULT.wasSuccessful():
+        ORCH = GraspOrchestrator()
+        ORCH.run_mission(cycles=5)
+    else:
+        sys.exit(1)
